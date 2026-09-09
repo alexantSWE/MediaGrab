@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import media.grab.os.MediaGrabApp
 import media.grab.os.data.model.DownloadStatus
 import media.grab.os.data.model.FileNameMode
+import media.grab.os.data.model.YtDlpUpdateChannel
 import media.grab.os.data.preferences.AccessMode
 import media.grab.os.data.preferences.Settings
 import media.grab.os.data.preferences.ThemeMode
@@ -39,9 +40,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         DownloadService.start(getApplication(), item.url, fmt, retryId = id)
     }
 
-    fun updateEngine(onResult: (String) -> Unit) = viewModelScope.launch {
+    fun updateEngine(channel: YtDlpUpdateChannel, onResult: (String) -> Unit) = viewModelScope.launch {
         val msg = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            media.grab.os.download.YtDlpEngine.update(getApplication(), force = true)
+            media.grab.os.download.YtDlpEngine.update(getApplication(), channel, force = true)
         }
         onResult(msg)
     }
@@ -53,6 +54,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setTheme(mode: ThemeMode) = viewModelScope.launch { prefs.setTheme(mode) }
     fun setAccessMode(mode: AccessMode) = viewModelScope.launch { prefs.setAccessMode(mode) }
     fun setFileNameMode(mode: FileNameMode) = viewModelScope.launch { prefs.setFileNameMode(mode) }
+    fun setYtDlpUpdateChannel(channel: YtDlpUpdateChannel) =
+        viewModelScope.launch { prefs.setYtDlpUpdateChannel(channel) }
     fun completeOnboarding() = viewModelScope.launch { prefs.setOnboardingDone(true) }
 
     val activeCount get() = downloads.value.count {

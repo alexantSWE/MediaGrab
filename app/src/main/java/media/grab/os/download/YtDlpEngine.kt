@@ -8,6 +8,7 @@ import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import media.grab.os.data.model.DownloadFormat
 import media.grab.os.data.model.FileNameMode
+import media.grab.os.data.model.YtDlpUpdateChannel
 import java.io.File
 
 /**
@@ -19,7 +20,7 @@ object YtDlpEngine {
     private const val TAG = "YtDlpEngine"
 
     @Volatile private var initialized = false
-    @Volatile private var updated = false
+    @Volatile private var updatedChannel: YtDlpUpdateChannel? = null
     @Volatile var lastInitError: String? = null
         private set
     @Volatile var ytdlpVersion: String? = null
@@ -46,13 +47,23 @@ object YtDlpEngine {
     }
 
     /** Pull the latest yt-dlp extractors. Safe to call repeatedly; cheap if already current. */
-    fun update(context: Context, force: Boolean = false): String {
+    fun update(
+        context: Context,
+        channel: YtDlpUpdateChannel = YtDlpUpdateChannel.STABLE,
+        force: Boolean = false
+    ): String {
         if (!ensureInit(context)) return "Engine not available: ${lastInitError ?: "init failed"}"
-        if (updated && !force) return "Already updated this session (yt-dlp ${ytdlpVersion ?: "?"})"
+        if (updatedChannel == channel && !force) {
+            return "Already checked this session (yt-dlp ${ytdlpVersion ?: "?"})"
+        }
         return try {
+            val updateChannel = when (channel) {
+                YtDlpUpdateChannel.STABLE -> YoutubeDL.UpdateChannel.STABLE
+                YtDlpUpdateChannel.NIGHTLY -> YoutubeDL.UpdateChannel.NIGHTLY
+            }
             val status = YoutubeDL.getInstance()
-                .updateYoutubeDL(context.applicationContext, YoutubeDL.UpdateChannel.STABLE)
-            updated = true
+                .updateYoutubeDL(context.applicationContext, updateChannel)
+            updatedChannel = channel
             ytdlpVersion = runCatching { YoutubeDL.getInstance().version(context.applicationContext) }.getOrNull()
             when (status) {
                 YoutubeDL.UpdateStatus.DONE -> "Updated to yt-dlp ${ytdlpVersion ?: "latest"}"
@@ -82,13 +93,14 @@ object YtDlpEngine {
         format: DownloadFormat,
         processId: String,
         fileNameMode: FileNameMode,
+        updateChannel: YtDlpUpdateChannel,
         onProgress: (Int) -> Unit
     ): YtResult {
         if (!ensureInit(context)) {
             throw IllegalStateException("yt-dlp not available: ${lastInitError ?: "init failed"}")
         }
         // Best effort: make sure extractors are fresh before the first real download.
-        if (!updated) runCatching { update(context) }
+        if (updatedChannel != updateChannel) runCatching { update(context, updateChannel) }
 
         val workDir = File(parentDir, "yt_$processId").apply {
             deleteRecursively(); mkdirs()
@@ -109,8 +121,16 @@ object YtDlpEngine {
             }
         }
 
-        YoutubeDL.getInstance().execute(request, processId) { progress, _, _ ->
-            if (progress >= 0f) onProgress(progress.toInt().coerceIn(0, 100))
+        try {
+            execute(request, processId, onProgress)
+        } catch (nightlyFailure: Throwable) {
+            if (updateChannel != YtDlpUpdateChannel.NIGHTLY) throw nightlyFailure
+            Log.w(TAG, "Nightly yt-dlp failed; restoring stable channel", nightlyFailure)
+            val recovery = update(context, YtDlpUpdateChannel.STABLE, force = true)
+            if (!recovery.startsWith("Updated") && !recovery.startsWith("Already up to date")) {
+                throw nightlyFailure
+            }
+            execute(request, processId, onProgress)
         }
 
         // The merged video (or the extracted audio) is the largest file in the work dir.
@@ -121,6 +141,12 @@ object YtDlpEngine {
 
         val title = produced.nameWithoutExtension.replace('_', ' ').trim()
         return YtResult(produced, title)
+    }
+
+    private fun execute(request: YoutubeDLRequest, processId: String, onProgress: (Int) -> Unit) {
+        YoutubeDL.getInstance().execute(request, processId) { progress, _, _ ->
+            if (progress >= 0f) onProgress(progress.toInt().coerceIn(0, 100))
+        }
     }
 
     fun cancel(processId: String) {

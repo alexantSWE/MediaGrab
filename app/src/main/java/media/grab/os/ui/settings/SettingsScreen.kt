@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import media.grab.os.data.preferences.AccessMode
 import media.grab.os.data.preferences.ThemeMode
 import media.grab.os.data.model.FileNameMode
+import media.grab.os.data.model.YtDlpUpdateChannel
 import media.grab.os.BuildConfig
 import media.grab.os.download.YtDlpEngine
 import media.grab.os.privileged.RootHelper
@@ -74,11 +75,28 @@ fun SettingsScreen(vm: AppViewModel) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text("Version: ${YtDlpEngine.ytdlpVersion ?: "initializing…"}", style = MaterialTheme.typography.bodySmall)
+            Text("Update channel", style = MaterialTheme.typography.bodyMedium)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                YtDlpUpdateChannel.entries.forEach { channel ->
+                    FilterChip(
+                        selected = settings.ytDlpUpdateChannel == channel,
+                        onClick = { vm.setYtDlpUpdateChannel(channel) },
+                        label = { Text(channel.label) }
+                    )
+                }
+            }
+            if (settings.ytDlpUpdateChannel == YtDlpUpdateChannel.NIGHTLY) {
+                Text(
+                    "Nightly builds arrive sooner but may contain regressions.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
             OutlinedButton(
                 onClick = {
                     if (!updating) {
                         updating = true; engineMsg = "Updating…"
-                        vm.updateEngine { result -> engineMsg = result; updating = false }
+                        vm.updateEngine(settings.ytDlpUpdateChannel) { result -> engineMsg = result; updating = false }
                     }
                 },
                 enabled = !updating,

@@ -10,6 +10,11 @@ enum class FileNameMode(val label: String) {
     PLATFORM_TIMESTAMP("Platform and timestamp")
 }
 
+enum class YtDlpUpdateChannel(val label: String) {
+    STABLE("Stable"),
+    NIGHTLY("Nightly")
+}
+
 enum class DownloadStatus { QUEUED, EXTRACTING, DOWNLOADING, COMPLETED, FAILED }
 
 /** User-selectable quality / container. */

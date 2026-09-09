@@ -71,12 +71,14 @@ class DownloadService : Service() {
         repo.upsert(item)
         updateForeground(platform.displayName, 0)
 
-        val fileNameMode = (application as MediaGrabApp).container.userPreferences.settings.first().fileNameMode
+        val settings = (application as MediaGrabApp).container.userPreferences.settings.first()
+        val fileNameMode = settings.fileNameMode
+        val updateChannel = settings.ytDlpUpdateChannel
         var ytError: String? = null
         val ytOk = runCatching {
             item = item.copy(status = DownloadStatus.DOWNLOADING)
             repo.upsert(item)
-            val res = YtDlpEngine.download(this, url, cacheDir, format, id, fileNameMode) { p ->
+            val res = YtDlpEngine.download(this, url, cacheDir, format, id, fileNameMode, updateChannel) { p ->
                 item = item.copy(progress = p)
                 repo.upsert(item)
                 updateForeground(item.title.ifBlank { platform.displayName }, p)
