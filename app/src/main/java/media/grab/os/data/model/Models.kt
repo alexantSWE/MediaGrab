@@ -4,6 +4,12 @@ import kotlinx.serialization.Serializable
 
 enum class MediaType { IMAGE, VIDEO, AUDIO, UNKNOWN }
 
+enum class FileNameMode(val label: String) {
+    ORIGINAL("Original filename"),
+    TITLE("Media title"),
+    PLATFORM_TIMESTAMP("Platform and timestamp")
+}
+
 enum class DownloadStatus { QUEUED, EXTRACTING, DOWNLOADING, COMPLETED, FAILED }
 
 /** User-selectable quality / container. */

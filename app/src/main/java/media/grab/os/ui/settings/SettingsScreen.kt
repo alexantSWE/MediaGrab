@@ -33,6 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import media.grab.os.data.preferences.AccessMode
 import media.grab.os.data.preferences.ThemeMode
+import media.grab.os.data.model.FileNameMode
+import media.grab.os.BuildConfig
 import media.grab.os.download.YtDlpEngine
 import media.grab.os.privileged.RootHelper
 import media.grab.os.privileged.ShizukuHelper
@@ -92,6 +94,23 @@ fun SettingsScreen(vm: AppViewModel) {
             }
         }
 
+        SettingsCard("File naming") {
+            Text(
+                "Choose the name used when media is saved to Download/MediaGrab.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FileNameMode.entries.forEach { mode ->
+                    FilterChip(
+                        selected = settings.fileNameMode == mode,
+                        onClick = { vm.setFileNameMode(mode) },
+                        label = { Text(mode.label) }
+                    )
+                }
+            }
+        }
+
         SettingsCard("Access mode") {
             Text(
                 "Downloads to /Download/ need no root. These modes are for grabbing from protected locations.",
@@ -125,7 +144,7 @@ fun SettingsScreen(vm: AppViewModel) {
         }
 
         SettingsCard("About") {
-            Text("MediaGrab v1.0.0", style = MaterialTheme.typography.bodyMedium)
+            Text("MediaGrab v${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium)
             Text("Free & open-source · GPL-3.0 · No ads, no telemetry.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import media.grab.os.MediaGrabApp
 import media.grab.os.data.model.DownloadStatus
+import media.grab.os.data.model.FileNameMode
 import media.grab.os.data.preferences.AccessMode
 import media.grab.os.data.preferences.Settings
 import media.grab.os.data.preferences.ThemeMode
@@ -51,6 +52,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setTheme(mode: ThemeMode) = viewModelScope.launch { prefs.setTheme(mode) }
     fun setAccessMode(mode: AccessMode) = viewModelScope.launch { prefs.setAccessMode(mode) }
+    fun setFileNameMode(mode: FileNameMode) = viewModelScope.launch { prefs.setFileNameMode(mode) }
     fun completeOnboarding() = viewModelScope.launch { prefs.setOnboardingDone(true) }
 
     val activeCount get() = downloads.value.count {

@@ -7,6 +7,7 @@ import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import media.grab.os.data.model.DownloadFormat
+import media.grab.os.data.model.FileNameMode
 import java.io.File
 
 /**
@@ -80,6 +81,7 @@ object YtDlpEngine {
         parentDir: File,
         format: DownloadFormat,
         processId: String,
+        fileNameMode: FileNameMode,
         onProgress: (Int) -> Unit
     ): YtResult {
         if (!ensureInit(context)) {
@@ -95,7 +97,7 @@ object YtDlpEngine {
             addOption("-o", File(workDir, "%(title).80s.%(ext)s").absolutePath)
             addOption("--no-playlist")
             addOption("--no-mtime")
-            addOption("--restrict-filenames")
+            if (fileNameMode == FileNameMode.ORIGINAL) addOption("--content-disposition")
             addOption("--no-warnings")
             addOption("--no-part")
             addOption("-f", formatSelector(format))

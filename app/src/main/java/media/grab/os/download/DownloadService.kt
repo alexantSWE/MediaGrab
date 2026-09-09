@@ -9,11 +9,13 @@ import android.os.IBinder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import media.grab.os.MediaGrabApp
 import media.grab.os.data.model.Download
 import media.grab.os.data.model.DownloadFormat
 import media.grab.os.data.model.DownloadStatus
+import media.grab.os.data.model.FileNameMode
 import media.grab.os.data.model.MediaType
 import media.grab.os.data.model.Platform
 import media.grab.os.data.repository.DownloadRepository
@@ -54,7 +56,7 @@ class DownloadService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun runDownload(url: String, format: DownloadFormat, retryId: String?) {
+    private suspend fun runDownload(url: String, format: DownloadFormat, retryId: String?) {
         val platform = Platform.fromUrl(url)
         val id = retryId ?: UUID.randomUUID().toString()
         val notifId = id.hashCode() and 0xFFFF
@@ -69,17 +71,18 @@ class DownloadService : Service() {
         repo.upsert(item)
         updateForeground(platform.displayName, 0)
 
+        val fileNameMode = (application as MediaGrabApp).container.userPreferences.settings.first().fileNameMode
         var ytError: String? = null
         val ytOk = runCatching {
             item = item.copy(status = DownloadStatus.DOWNLOADING)
             repo.upsert(item)
-            val res = YtDlpEngine.download(this, url, cacheDir, format, id) { p ->
+            val res = YtDlpEngine.download(this, url, cacheDir, format, id, fileNameMode) { p ->
                 item = item.copy(progress = p)
                 repo.upsert(item)
                 updateForeground(item.title.ifBlank { platform.displayName }, p)
             }
             val type = if (format.isAudio) MediaType.AUDIO else guessType(res.file.extension)
-            val savedUri = FileSaver.saveFile(this, res.file, res.title.ifBlank { defaultName(platform) }, type)
+            val savedUri = FileSaver.saveFile(this, res.file, nameFor(fileNameMode, platform, res.title, res.file.name), type)
             res.file.parentFile?.deleteRecursively()
             finishSuccess(item.copy(title = res.title, mediaType = type, fileName = res.file.name), savedUri, notifId)
             true
@@ -108,9 +111,9 @@ class DownloadService : Service() {
                     item = item.copy(progress = p); repo.upsert(item)
                     updateForeground(item.title.ifBlank { platform.displayName }, p)
                 }
-                val saved = FileSaver.saveFile(this, temp, item.title.ifBlank { defaultName(platform) }, media.mediaType)
-                temp.delete()
-                finishSuccess(item.copy(fileName = temp.name), saved, notifId)
+                val saved = FileSaver.saveFile(this, temp.file, nameFor(fileNameMode, platform, item.title, temp.fileName), media.mediaType)
+                temp.file.delete()
+                finishSuccess(item.copy(fileName = temp.file.name), saved, notifId)
             }.onFailure { err ->
                 val msg = buildString {
                     append(err.message ?: "Download failed.")
@@ -122,11 +125,17 @@ class DownloadService : Service() {
         stopIfIdle()
     }
 
-    private fun downloadToTemp(url: String, ext: String, onProgress: (Int) -> Unit): File {
+    private data class TempDownload(val file: File, val fileName: String)
+
+    private fun downloadToTemp(url: String, ext: String, onProgress: (Int) -> Unit): TempDownload {
         val temp = File.createTempFile("dl_", ".$ext", cacheDir)
+        var serverName: String? = null
         HttpClient.client.newCall(HttpClient.request(url, mobile = true)).execute().use { resp ->
             if (!resp.isSuccessful) throw IllegalStateException("HTTP ${resp.code}")
             val body = resp.body ?: throw IllegalStateException("Empty body")
+            serverName = resp.header("Content-Disposition")
+                ?.let(::fileNameFromContentDisposition)
+                ?: resp.request.url.pathSegments.lastOrNull()?.takeIf { it.isNotBlank() }
             val total = body.contentLength()
             body.byteStream().use { input ->
                 temp.outputStream().use { output ->
@@ -142,7 +151,17 @@ class DownloadService : Service() {
                 }
             }
         }
-        return temp
+        return TempDownload(temp, serverName ?: temp.name)
+    }
+
+    private fun fileNameFromContentDisposition(header: String): String? =
+        Regex("filename\\*?=(?:UTF-8''|\\\")?([^;\\\"]+)", RegexOption.IGNORE_CASE)
+            .find(header)?.groupValues?.get(1)?.trim()?.let { java.net.URLDecoder.decode(it, "UTF-8") }
+
+    private fun nameFor(mode: FileNameMode, platform: Platform, title: String, original: String): String = when (mode) {
+        FileNameMode.ORIGINAL -> original
+        FileNameMode.TITLE -> title.ifBlank { original }
+        FileNameMode.PLATFORM_TIMESTAMP -> defaultName(platform)
     }
 
     private fun finishSuccess(base: Download, uri: String, notifId: Int) {
