@@ -105,11 +105,16 @@ object YtDlpEngine {
         val workDir = File(parentDir, "yt_$processId").apply {
             deleteRecursively(); mkdirs()
         }
+        val outTemplate = if (fileNameMode == FileNameMode.UPLOADER_TITLE) {
+            "%(uploader,channel)s - %(title).80s.%(ext)s"
+        } else {
+            "%(title).80s.%(ext)s"
+        }
         val request = YoutubeDLRequest(url).apply {
-            addOption("-o", File(workDir, "%(title).80s.%(ext)s").absolutePath)
+            addOption("-o", File(workDir, outTemplate).absolutePath)
             addOption("--no-playlist")
             addOption("--no-mtime")
-            addOption("--restrict-filenames")
+            if (fileNameMode != FileNameMode.UPLOADER_TITLE) addOption("--restrict-filenames")
             addOption("--no-warnings")
             addOption("--no-part")
             addOption("-f", formatSelector(format))

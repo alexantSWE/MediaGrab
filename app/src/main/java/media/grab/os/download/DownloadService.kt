@@ -162,7 +162,7 @@ class DownloadService : Service() {
 
     private fun nameFor(mode: FileNameMode, platform: Platform, title: String, original: String): String = when (mode) {
         FileNameMode.ORIGINAL -> original
-        FileNameMode.TITLE -> title.ifBlank { original }
+        FileNameMode.TITLE, FileNameMode.UPLOADER_TITLE -> title.ifBlank { original }
         FileNameMode.PLATFORM_TIMESTAMP -> defaultName(platform)
     }
 
@@ -210,8 +210,11 @@ class DownloadService : Service() {
         MediaType.VIDEO -> "mp4"; MediaType.AUDIO -> "m4a"; MediaType.IMAGE -> "jpg"; MediaType.UNKNOWN -> "bin"
     }
 
-    private fun defaultName(platform: Platform) =
-        "${platform.displayName.lowercase().replace(Regex("[^a-z0-9]"), "")}_${System.currentTimeMillis()}"
+    private fun defaultName(platform: Platform): String {
+        val stamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.US)
+            .format(java.util.Date())
+        return "${platform.displayName.lowercase().replace(Regex("[^a-z0-9]"), "")}_$stamp"
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 

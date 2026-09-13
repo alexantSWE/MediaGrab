@@ -7,6 +7,7 @@ enum class MediaType { IMAGE, VIDEO, AUDIO, UNKNOWN }
 enum class FileNameMode(val label: String) {
     ORIGINAL("Original filename"),
     TITLE("Media title"),
+    UPLOADER_TITLE("Channel and title"),
     PLATFORM_TIMESTAMP("Platform and timestamp")
 }
 
