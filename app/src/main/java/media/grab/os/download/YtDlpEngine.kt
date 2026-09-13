@@ -109,7 +109,7 @@ object YtDlpEngine {
             addOption("-o", File(workDir, "%(title).80s.%(ext)s").absolutePath)
             addOption("--no-playlist")
             addOption("--no-mtime")
-            if (fileNameMode == FileNameMode.ORIGINAL) addOption("--content-disposition")
+            addOption("--restrict-filenames")
             addOption("--no-warnings")
             addOption("--no-part")
             addOption("-f", formatSelector(format))
